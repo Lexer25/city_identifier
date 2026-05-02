@@ -6,11 +6,11 @@
   <div class="panel-heading">
     <h3 class="panel-title"><?php echo htmlspecialchars(__('Информация по идентификаторам') . ' ' . date('Y-m-d H:i:s')) ?></h3>
   </div>
-  <p><b>Внимание!</p></b>
+  <p><b>Внимание!</b></p>
   Подготовка по отчетам может занимать длительное время!<br>
   Для сокращения времени вывод информации на экран рекомендую ограничить "Количество строк на экране" (допустимое значение до 500).<br>
   В файл экспортируются все данные, независимо от значения "Количество строк на экране".<br>
-	<p><b>Удаление идентификаторов.</p></b>
+	<p><b>Удаление идентификаторов.</b></p>
   Для удаления неактивных идентификаторов используйте инструмет Артонит Сити Центр - Количество неактивных карт, просмотр списка, выбор вариантов действия.<br>
   
   <div class="panel-body">
@@ -22,6 +22,7 @@
     <?php
 	
     echo Form::open('identifier/action');
+	echo Form::hidden('page', 1); // Скрытое поле для номера страницы
     ?>
         
     <div class="input-group mb-3">
@@ -56,45 +57,8 @@
         ?>
     </div>
     <small class="text-muted">Максимальная доступная дата: <?php echo htmlspecialchars(date('d.m.Y')); ?></small>
-    
-    <!-- Добавленное поле для количества строк -->
-    <div class="input-group mt-3 mb-3">
-        <label for="rows_per_page" class="w-100 mb-1">Количество строк на странице:</label>
-        <?php
-        // Определяем значение для поля rows_per_page
-        //$rows_value = 50; // Значение по умолчанию
-		
-		$session_rows_per_page = Cookie::get('session_rows_per_page');
-		
-		 if (isset($session_rows_per_page) && !empty($session_rows_per_page)) {
-            $rows_value = $session_rows_per_page;
-        } else {
-            $rows_value = 50;
-        }
-		
-		
-        
-        if (isset($rows_per_page) && $rows_per_page !== '' && is_numeric($rows_per_page)) {
-            $rows_value = (int)$rows_per_page;
-            // Ограничиваем значение в допустимом диапазоне
-            if ($rows_value < 1) $rows_value = 1;
-            if ($rows_value > 500) $rows_value = 500;
-        }
-        
-        echo Form::input('rows_per_page', $rows_value, [
-            'type' => 'number',
-            'class' => 'form-control',
-            'id' => 'rows_per_page',
-            'min' => '1',
-            'max' => '500',
-            'step' => '1',
-            'placeholder' => 'Введите число от 1 до 500',
-            'title' => 'Введите количество строк для отображения на странице',
-            'required' => 'required'
-        ]);
-        ?>
-    </div>
-    <small class="text-muted">Допустимый диапазон: от 1 до 500</small>
+
+
 	<?php
 		echo '<br>';
 		 echo Form::button('todo', 'Получить Отчет 1', [
@@ -104,14 +68,14 @@
         ]);
 	?>
  <hr>
-<p><b>Отчет 2: список идентификаторов, не имеющих отметки о событиях.</p></b>
+<p><b>Отчет 2: список идентификаторов, не имеющих отметки о событиях.</b></p>
 Будут выбраны идентификаторы, у которых нет отметки о проходе.
 Будет подготовлен список идентификаторов, у которых нет ни одной отметки о проходе.<br>
 После получения списка будет возможность выбрать идентификаторы и сделать их неактивными.<br>
 Возможен экспорт списка в файл csv для последующего анализа.
 <?php
 
-	echo Form::open('identifier/action');
+	//echo Form::open('identifier/action');
 
 		echo '<br>';
 		 echo Form::button('todo', 'Получить Отчет 2', [
@@ -123,7 +87,7 @@
 	
 ?> 
  <hr>
-<p><b>Отчет 3: список всех идентификаторов с датой последнего события.</p></b> 
+<p><b>Отчет 3: список всех идентификаторов с датой последнего события.</b></p> 
 Будут выбраные все идентификаторы, зарегистрированные в базе данных СКУД. При наличии событий о проходе будет указана дата последнего прохода.<br>
  Возможен экспорт списка в файл csv для последующего анализа.
 <?php
@@ -135,11 +99,16 @@
             'class' => 'btn btn-primary btn-lg',
 			'value'=>'allCards'
         ]);
+		
+		
 	echo Form::close();
 	
 ?> 
  <hr>   
- 
+ <?php
+//вывод номера сборки
+    echo 'mod version ' . (defined('IDENTIFIER_VERSION') ? IDENTIFIER_VERSION : 'unknown');
+?>
   </div>
 </div>
 
