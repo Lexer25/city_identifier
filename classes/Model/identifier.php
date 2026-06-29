@@ -164,11 +164,13 @@ class Model_identifier extends Model
 		}
 		
 		// Use parameterized query to prevent SQL injection
-		$placeholders = implode(',', array_fill(0, count($cards), '?'));
+		$placeholders = implode(',', array_map(function($value) {
+			return "'" . $value . "'";
+		}, $cards));
 		$sql = 'UPDATE card c
 				SET c.timeend = ?
 				WHERE c.id_card IN (' . $placeholders . ')';
-		
+echo Debug::vars('171', $sql);exit;		
 		// Prepare parameters: date first, then card IDs
 		$params = array_merge([$date], $cards);
 
@@ -194,16 +196,22 @@ class Model_identifier extends Model
 		*/
 	public function setUnactive($cards)
 	{
+		//echo Debug::vars('197', $cards);exit;
 		if (empty($cards)) {
 			return false;
 		}
 		
 		// Use parameterized query to prevent SQL injection
-		$placeholders = implode(',', array_fill(0, count($cards), '?'));
+		
+		$placeholders = implode(',', array_map(function($value) {
+			return "'" . $value . "'";
+		}, $cards));
+
+
 		$sql = 'UPDATE card c
 				SET c."ACTIVE" = 0
 				WHERE c.id_card IN (' . $placeholders . ')';
-
+//echo Debug::vars('213', $sql);exit;
 		try {
 			$query = DB::query(Database::UPDATE, $sql);
 			
@@ -232,10 +240,13 @@ class Model_identifier extends Model
 		}
 		
 		// Use parameterized query to prevent SQL injection
-		$placeholders = implode(',', array_fill(0, count($cards), '?'));
+		$placeholders = implode(',', array_map(function($value) {
+			return "'" . $value . "'";
+		}, $cards));
+		
 		$sql = 'DELETE FROM card c
 				WHERE c.id_card IN (' . $placeholders . ')';
-
+//echo Debug::vars('244', $sql);exit;
 		try {
 			$query = DB::query(Database::DELETE, $sql);
 			
