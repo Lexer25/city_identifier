@@ -168,9 +168,9 @@ class Model_identifier extends Model
 			return "'" . $value . "'";
 		}, $cards));
 		$sql = 'UPDATE card c
-				SET c.timeend = ?
+				SET c.timeend = \''.$date.'\'
 				WHERE c.id_card IN (' . $placeholders . ')';
-echo Debug::vars('171', $sql);exit;		
+//echo Debug::vars('171', $sql);exit;		
 		// Prepare parameters: date first, then card IDs
 		$params = array_merge([$date], $cards);
 
@@ -178,9 +178,9 @@ echo Debug::vars('171', $sql);exit;
 			$query = DB::query(Database::UPDATE, $sql);
 			
 			// Bind parameters
-			foreach ($params as $i => $value) {
+			/* foreach ($params as $i => $value) {
 				$query->param($i, $value);
-			}
+			} */
 			
 			$query->execute(Database::instance('fb'));
 			return true;
@@ -216,9 +216,9 @@ echo Debug::vars('171', $sql);exit;
 			$query = DB::query(Database::UPDATE, $sql);
 			
 			// Bind parameters
-			foreach ($cards as $i => $card) {
+			/* foreach ($cards as $i => $card) {
 				$query->param($i, $card);
-			}
+			} */
 			
 			$query->execute(Database::instance('fb'));
 			return true;
@@ -251,9 +251,9 @@ echo Debug::vars('171', $sql);exit;
 			$query = DB::query(Database::DELETE, $sql);
 			
 			// Bind parameters
-			foreach ($cards as $i => $card) {
+			/* foreach ($cards as $i => $card) {
 				$query->param($i, $card);
-			}
+			} */
 			
 			$query->execute(Database::instance('fb'));
 			return true;
