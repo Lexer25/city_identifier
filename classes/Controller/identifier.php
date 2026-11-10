@@ -19,16 +19,40 @@ class Controller_identifier extends Controller_Template {
 				'cardNoEvent' => 'Список идентификаторов, не имеющих отметки о событиях.',
 				'allCards' => 'Список всех идентификаторов.',
 				'cardNoEventDate' => 'Список идентификаторов, у которых нет событий после указанной даты.',
+				'peoplePassCount' => 'Количество проходов по людям за период.',
 				
 			);
    
   	
 	public function before()
 	{
-			
-			parent::before();
-			$session = Session::instance();
-			
+		parent::before();
+
+		// P0: раздел содержит персональные данные и операции над картами,
+		// поэтому доступен только авторизованным пользователям.
+		// Проверка в шаблоне (_table.php) скрывает только кнопки, но не защищает action.
+		if ( ! Auth::instance()->logged_in())
+		{
+			$this->set_flash_message('warning', __('Для работы с разделом «Идентификаторы» необходимо авторизоваться'));
+			$this->redirect('dashboard');
+		}
+	}
+
+	/**
+	 * P0: проверка CSRF-токена для всех изменяющих запросов.
+	 * Токен выводится в формах (index.php, _table.php) и приходит в поле csrf_token.
+	 */
+	private function check_csrf()
+	{
+		$token = (string) Arr::get($_POST, 'csrf_token', '');
+
+		if ( ! Security::check($token))
+		{
+			Kohana::$log->add(Log::WARNING, 'identifier: отклонён запрос без корректного CSRF-токена');
+
+			$this->set_flash_message('error', __('Запрос отклонён: устаревшая сессия или отсутствует CSRF-токен. Обновите страницу и повторите.'));
+			$this->redirect('identifier');
+		}
 	}
 	
 	public function action_index()
@@ -46,11 +70,10 @@ class Controller_identifier extends Controller_Template {
 	
 	public function action_cardNoEventDate()
 	{
-		
-		$identifier=Model::factory('identifier');
-		return $identifier->getLastEvent();//выбор всех карт с указанием последней даты прохода
-		
-		
+		// Маршрут оставлен для совместимости со старыми ссылками.
+		// Раньше здесь вызывался несуществующий Model_identifier::getLastEvent()
+		// и страница отдавала 500 со стектрейсом. Отчёт 1 строится через /identifier/action.
+		$this->redirect('identifier');
 	}
 	
 	
@@ -58,6 +81,8 @@ class Controller_identifier extends Controller_Template {
 	*/
 	public function action_action()
 	{
+		$this->check_csrf();
+
 		//echo Debug::vars('39', $_POST);exit;
 		Kohana::$log->add(Log::DEBUG, '62 identifier::action_control - POST: ' . print_r($_POST, true));		
 
@@ -66,11 +91,19 @@ class Controller_identifier extends Controller_Template {
 				->rule('todo', 'not_empty', array(':value'))
 				->rule('todo', 'in_array', array(':value', array_keys($this->options)));
 
-			// Если форма отправлена и нажата кнопка карт без событий до даты
-			if (isset($_POST['cardNoEventDate'])) {
+			// Если выбран отчёт «карты без событий после даты» — проверяем дату
+			if (Arr::get($_POST, 'todo') === 'cardNoEventDate') {
 				// Проверяем дату
 				$post->rule('event_date', 'not_empty')
 					 ->rule('event_date', 'date');
+			}
+
+			// Отчёт 4: количество проходов по людям — нужны обе даты периода
+			if (Arr::get($_POST, 'todo') === 'peoplePassCount') {
+				$post->rule('date_from', 'not_empty')
+					 ->rule('date_from', 'date')
+					 ->rule('date_to', 'not_empty')
+					 ->rule('date_to', 'date');
 			}
 			$arg=array();
 			// Проверяем данные
@@ -78,9 +111,13 @@ class Controller_identifier extends Controller_Template {
 			
 			//сохраняю дату в сессию
 			$event_date = $this->request->post('event_date');
+			$date_from = $this->request->post('date_from');
+			$date_to = $this->request->post('date_to');
 			$rows_per_page = $this->request->post('rows_per_page');
             //Session::instance()->set('session_event_date', $event_date);
 			Cookie::set('session_event_date', $event_date, 30 * 86400); // 30 дней в секундах
+			Cookie::set('session_date_from', $date_from, 30 * 86400); // 30 дней в секундах
+			Cookie::set('session_date_to', $date_to, 30 * 86400); // 30 дней в секундах
 			Cookie::set('session_rows_per_page', $rows_per_page, 30 * 86400); // 30 дней в секундах
 			
 			
@@ -99,7 +136,7 @@ class Controller_identifier extends Controller_Template {
 						// Обработка для cardNoEventDate (нужна дата)
 						//параметры (в т.ч. дата) передаются в модель в свойства arg
 						$model=Model::factory('identifier');
-						$model->arg=$_POST;//передал аргументы
+						$model->arg=array('event_date'=>$event_date);//передал аргументы (только дату, без служебных полей формы)
 						
 						$data = $model->cardNoEventDate();//получил результат
 						$arg=$model->arg;//запоминаю аргументы для передачи в view
@@ -110,6 +147,21 @@ class Controller_identifier extends Controller_Template {
 						// Обработка для allCards
 						$data=Model::factory('identifier')->allCards();
 						$view='allCards';
+						break;
+					case 'peoplePassCount':
+						// Отчёт 4: количество проходов (события 50 и 70) по людям за период
+						$model = Model::factory('identifier');
+						$model->arg = array('date_from' => $date_from, 'date_to' => $date_to);
+						$data = $model->peoplePassCount();
+
+						if ($model->mess)
+						{
+							$this->set_flash_message('error', $model->mess);
+							$this->redirect('identifier');
+						}
+
+						$arg = $model->arg;
+						$view = 'peoplePassCount';
 						break;
 					case 'expiredCards':
 						// Обработка для allCards
@@ -127,9 +179,9 @@ class Controller_identifier extends Controller_Template {
 						$view='invalidFormat';
 						break;
 					default:
-
-							echo Debug::vars('132');exit;
-							$this->redirect('identifier');
+						// Неизвестный тип отчёта: раньше здесь был echo Debug::vars(); exit;
+						$this->set_flash_message('error', __('Неизвестный тип отчёта'));
+						$this->redirect('identifier');
 					break;					
 											
 					
@@ -156,78 +208,24 @@ class Controller_identifier extends Controller_Template {
 		
 		
 			} else {
-				
-							$this->redirect('identifier');
+				// Неверные/неполные данные формы (например, некорректный период)
+				$this->set_flash_message('warning', __('Проверьте заполнение формы: даты указаны неверно или не заполнены'));
+				$this->redirect('identifier');
 			}
 			
 			
 		
 	}
 	
-	//а тут жду команды на обработку массивов карт (удалить, изменить...)
-	public function action_control_del()
-	{
-		echo Debug::vars('148', $_POST);exit;
-		$post=Validation::factory($_POST);
-		$post->rule('identifier', 'not_empty')
-				 ->rule('todo', 'not_empty')
-				->rule('todo', 'in_array', array(':value', array('unactive', 'delete')));
-		if($post->check())
-		{
-			switch(Arr::get($post, 'todo')){
-				case 'unactive'://вызов метода сделать карту неактивной.
-					//делю массив на блоки по 1024 записи - более в параметры SQL передавать нельзя.
-					$chunks = array_chunk(Arr::get($post, 'identifier'), 1024);
-
-					foreach ($chunks as $chunk) {
-						//вызываю метод unactive
-						$model=Model::factory('identifier');
-						if($model->setUnactive($chunk))
-						{
-							$result[]='OK';
-							
-						} else {
-							
-							$result[]='err '. $model->mess;
-						};
-						
-						
-					}
-				
-				break;
-				case 'delete'://вызов метода удаления карт delCardArray
-					//вызываю метод unactive
-						$chunks = array_chunk(Arr::get($post, 'identifier'), 1024);
-
-					foreach ($chunks as $chunk) {
-						//вызываю метод unactive
-						$model=Model::factory('identifier');
-						if($model->delCardArray($chunk))
-						{
-							$result[]='OK';
-							
-						} else {
-							
-							$result[]='err '. $model->mess;
-						};
-						
-						
-					}
-						
-				
-				break;
-				
-			}
-			
-			
-		}
-		$this->redirect('identifier');
-	}
+	// Старый обработчик массовых действий удалён: он начинался с отладочного
+	// echo Debug::vars($_POST); exit; и дублировал action_control (без CSRF/авторизации).
+	// Массовые операции выполняются через action_control.
 	
 	/** 1.02.2026 сохранение в cvs массива подготовленной выборки
 	*@input название модели, передается в POST
 	*/
 	public function action_save_csv() {
+		$this->check_csrf();
 		//echo Debug::vars('191', $_POST);exit;
 		$post = Validation::factory($_POST)
 				->rule('todo', 'not_empty', array(':value'))
@@ -245,6 +243,12 @@ class Controller_identifier extends Controller_Template {
 				
 				$jsonData = Arr::get($_POST, 'arg', '');
 				$arg = json_decode($jsonData, true); // true для массива
+
+				// Страховка от битого/пустого arg: не передаём NULL в модель
+				if ( ! is_array($arg)) {
+					Kohana::$log->add(Log::WARNING, 'identifier::save_csv - некорректный arg: '.print_r($jsonData, true));
+					$arg = array();
+				}
 				if ($this->request->method() === 'POST') {
 						
 						// Важно: полностью отключаем все шаблоны
@@ -257,6 +261,12 @@ class Controller_identifier extends Controller_Template {
 						$model->arg=$arg;
 						if (method_exists($model, $method)) {
 							$big_array = $model->$method();
+
+							// Ошибка выборки/некорректный период — не отдаём пустой файл
+							if ($model->mess) {
+								$this->set_flash_message('error', $model->mess);
+								$this->redirect('identifier');
+							}
 						} else {
 							// Обработка ошибки
 							throw new Kohana_Exception('Method :method not found', 
@@ -284,9 +294,13 @@ class Controller_identifier extends Controller_Template {
 						// 4. Выводим CSV данные
 						$output = fopen('php://output', 'w');
 						
-						fputcsv($output, array_keys(reset($big_array)), ';', '"');
-						foreach ($big_array as $row) {
-							fputcsv($output, $row, ';', '"');
+						if (empty($big_array)) {
+							fputcsv($output, array(__('Нет данных за указанный период')), ';', '"');
+						} else {
+							fputcsv($output, array_keys(reset($big_array)), ';', '"');
+							foreach ($big_array as $row) {
+								fputcsv($output, $row, ';', '"');
+							}
 						}
 						
 						fclose($output);
@@ -295,8 +309,9 @@ class Controller_identifier extends Controller_Template {
 						
 				}
 			} else {
-				
-				echo Debug::vars('272', $post);exit;
+				// Раньше здесь выводился дамп Validation и exit (утечка отладочной информации)
+				$this->set_flash_message('error', __('Не удалось подготовить файл: неверные параметры запроса'));
+				$this->redirect('identifier');
 			}
 			exit;
 	}
@@ -307,6 +322,8 @@ class Controller_identifier extends Controller_Template {
 		 */
 		public function action_control()
 		{
+			$this->check_csrf();
+
 			// Логируем входящие данные для отладки
 			Kohana::$log->add(Log::DEBUG, '308 identifier::action_control - POST: ' . print_r($_POST, true));
 			
@@ -316,9 +333,16 @@ class Controller_identifier extends Controller_Template {
 			
 			if (is_array($identifiers)) {
 				$identifiers = array_map(function($id) {
-					return trim($id, "'\"");
+					// Кавычки больше не «срезаем»: экранирование выполняет модель.
+					// Здесь убираем только пробельные символы по краям.
+					if ( ! is_scalar($id))
+					{
+						return '';
+					}
+
+					return trim((string) $id);
 				}, $identifiers);
-				$identifiers = array_filter($identifiers);
+				$identifiers = array_filter($identifiers, 'strlen');
 			} else {
 				$identifiers = array();
 			}
@@ -356,13 +380,10 @@ class Controller_identifier extends Controller_Template {
 					return;
 			}
 			
-			// Возвращаемся на страницу, с которой пришли
-			/* echo Debug::vars('355', $this );exit;
-			$redirect_url = Arr::get($_POST, 'redirect_url', 'identifier');
-			$this->redirect($redirect_url); */
-			Kohana::$log->add(Log::INFO, '362 action_control'.Debug::vars($this->request->referrer()));//exit;);
-			Kohana::$log->add(Log::INFO, '362-1 action_control '. print_r($this->request->referrer(), true));//exit;);
-			$this->redirect($this->request->referrer());
+			// P0: фиксированный редирект вместо $this->request->referrer().
+			// Referer подконтролен клиенту (open redirect), а без него пользователь
+			// уходил на дашборд и терял контекст отчёта.
+			$this->redirect('identifier');
 		}
 
 		/**

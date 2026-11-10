@@ -23,6 +23,7 @@
 	
     echo Form::open('identifier/action');
 	echo Form::hidden('page', 1); // Скрытое поле для номера страницы
+	echo Form::hidden('csrf_token', Security::token()); // P0: защита от CSRF
     ?>
         
     <div class="input-group mb-3">
@@ -101,6 +102,63 @@
         ]);
 		
 		
+?> 
+ <hr>
+<p><b>Отчет 4: количество проходов по людям за период.</b></p>
+Будут посчитаны все события типа 50 и 70 за указанный период (дата «по» включается) для каждого человека.
+В таблицу попадают все люди из базы СКУД; если проходов не было, будет выведен 0.<br>
+Возможен экспорт всей таблицы в файл csv.
+<?php
+	// Значения по умолчанию: с первого числа текущего месяца по сегодня;
+	// после первого запуска берутся из cookie (как дата в отчёте 1)
+	$session_date_from = Cookie::get('session_date_from');
+	$session_date_to = Cookie::get('session_date_to');
+
+	$date_from_value = !empty($session_date_from) ? $session_date_from : date('Y-m-01');
+	$date_to_value = !empty($session_date_to) ? $session_date_to : date('Y-m-d');
+
+	if ($date_from_value > $current_date) {
+		$date_from_value = $current_date;
+	}
+	if ($date_to_value > $current_date) {
+		$date_to_value = $current_date;
+	}
+?>
+<div class="row">
+    <div class="col-sm-4">
+        <label for="date_from">Дата с:</label>
+        <?php
+        echo Form::input('date_from', $date_from_value, array(
+            'type' => 'date',
+            'class' => 'form-control date-picker',
+            'id' => 'date_from',
+            'max' => $current_date,
+        ));
+        ?>
+    </div>
+    <div class="col-sm-4">
+        <label for="date_to">Дата по:</label>
+        <?php
+        echo Form::input('date_to', $date_to_value, array(
+            'type' => 'date',
+            'class' => 'form-control date-picker',
+            'id' => 'date_to',
+            'max' => $current_date,
+        ));
+        ?>
+    </div>
+</div>
+<?php
+	echo '<br>';
+	echo Form::button('todo', 'Получить отчет 4', array(
+		'type' => 'submit',
+		'class' => 'btn btn-primary btn-lg',
+		'value' => 'peoplePassCount',
+	));
+?>
+ <hr>
+<?php
+	
 	echo Form::close();
 	
 ?> 

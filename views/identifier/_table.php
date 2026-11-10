@@ -15,6 +15,9 @@
  */
  
 ini_set('memory_limit', '256M');
+
+// Показывать ли колонку выбора карт (для отчётов по людям она не нужна)
+$show_checkboxes = isset($show_checkboxes) ? $show_checkboxes : TRUE;
 ?>
 
 <div class="panel panel-primary">
@@ -45,6 +48,7 @@ ini_set('memory_limit', '256M');
         <div class="mb-3" style="margin-bottom: 15px;">
             <?php 
             echo Form::open('identifier/save_csv', array('class' => 'form-inline'));
+            echo Form::hidden('csrf_token', Security::token()); // P0: защита от CSRF
             echo Form::button('todo', __('Сохранить список в файл'), array(
                 'value' => isset($type) ? $type : '',
                 'class' => 'btn btn-primary',
@@ -52,7 +56,11 @@ ini_set('memory_limit', '256M');
             ));
             
             if (isset($arg)) {
-                echo Form::hidden('arg', htmlspecialchars(json_encode($arg)));
+                // Form::hidden сам экранирует значение для HTML.
+                // Повторный htmlspecialchars() приводил к &amp;quot; в атрибуте:
+                // браузер отправлял &quot; вместо кавычек, json_decode() падал,
+                // и экспорт уходил без периода/даты.
+                echo Form::hidden('arg', json_encode($arg));
             }
             echo Form::close();
             ?>
@@ -67,6 +75,7 @@ ini_set('memory_limit', '256M');
         
         <!-- Основная форма с таблицей -->
         <?php echo Form::open('identifier/control', array('class' => 'form-inline', 'id' => 'cards-form')); ?>
+        <?php echo Form::hidden('csrf_token', Security::token()); // P0: защита от CSRF ?>
         
         <?php if (isset($list) && !empty($list)) { ?>
             
@@ -130,6 +139,7 @@ ini_set('memory_limit', '256M');
                     <thead>
                         <tr>
                             <th width="50">№</th>
+                            <?php if ($show_checkboxes) { ?>
                             <th width="80">
                                 <div class="text-center">
                                     <label class="d-block">
@@ -138,10 +148,11 @@ ini_set('memory_limit', '256M');
                                     </label>
                                 </div>
                             </th>
+                            <?php } ?>
                             <?php foreach ($headers as $header_key => $header_title) { ?>
                                 <th><?php echo htmlspecialchars($header_title); ?></th>
                             <?php } ?>
-                        </th>
+                        </tr>
                     </thead>
                     
                     <tbody>
@@ -153,6 +164,7 @@ ini_set('memory_limit', '256M');
                         ?>
                             <tr>
                                 <td class="text-center"><?php echo ++$sn; ?></td>
+                                <?php if ($show_checkboxes) { ?>
                                 <td class="text-center">
                                     <label>
                                         <?php echo Form::checkbox('identifier[]', $safeCardId, false, array(
@@ -161,6 +173,7 @@ ini_set('memory_limit', '256M');
                                         )); ?>
                                     </label>
                                 </td>
+                                <?php } ?>
                                 <?php foreach (array_keys($headers) as $field) { ?>
                                     <td>
                                         <?php
